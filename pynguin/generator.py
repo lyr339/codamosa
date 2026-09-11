@@ -214,7 +214,10 @@ def _setup_language_model_seeding(
         or config.configuration.algorithm == config.Algorithm.CODAMOSA
     ):
         if (
-            config.configuration.codamosa.authorization_key == ""
+            (
+                config.configuration.codamosa.authorization_key == ""
+                and os.environ.get("CODAMOSA_API_KEY", "") == ""
+            )
             or config.configuration.codamosa.model_name == ""
         ) and (config.configuration.codamosa.replay_generation_from_file == ""):
             _LOGGER.error(
@@ -247,6 +250,7 @@ def _setup_language_model_seeding(
             model.languagemodel.temperature = config.configuration.codamosa.temperature
             model.languagemodel.authorization_key = (
                 config.configuration.codamosa.authorization_key
+                or os.environ.get("CODAMOSA_API_KEY", "")
             )
             model.languagemodel.complete_model = (
                 config.configuration.codamosa.model_name

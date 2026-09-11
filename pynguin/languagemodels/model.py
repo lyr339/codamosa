@@ -95,18 +95,78 @@ def _openai_api_legacy_request(self, function_header, context):
 
 def _openai_api_request(self, function_header, context):
     url = f"{self._model_base_url}{self._model_relative_url}"
-    payload = {
-        "model": self._complete_model,
-        "prompt": context + "\n" + function_header,
-        "max_tokens": 200,
-        "temperature": self._temperature,
-        "stop": ["\n# Unit test for", "\ndef ", "\nclass "],
-    }
+    prompt = context + "\n" + function_header
+    endpoint = self._model_relative_url.rstrip("/")
+
+    if endpoint.endswith("/responses"):
+        # Responses API, used by current Codex-capable OpenAI-compatible proxies.
+        payload = {
+            "model": self._complete_model,
+            "instructions": (
+                "Complete the final Python unit-test function from the supplied "
+                "source context. Return only the Python code that continues the "
+                "final function header. Do not use Markdown or ask questions."
+            ),
+            "input": prompt,
+            # Reasoning models count reasoning tokens against this limit.  The
+            # original value of 200 often leaves no room for generated code.
+            "max_output_tokens": 800,
+            "reasoning": {"effort": "low"},
+        }
+    elif endpoint.endswith("/chat/completions"):
+        # Chat Completions compatibility endpoint.
+        payload = {
+            "model": self._complete_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 200,
+            "temperature": self._temperature,
+            "stop": ["\n# Unit test for", "\ndef ", "\nclass "],
+        }
+    else:
+        # Legacy Completions API expected by the original CodaMOSA code.
+        payload = {
+            "model": self._complete_model,
+            "prompt": prompt,
+            "max_tokens": 200,
+            "temperature": self._temperature,
+            "stop": ["\n# Unit test for", "\ndef ", "\nclass "],
+        }
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {self._authorization_key}",
     }
     return url, payload, headers
+
+
+def _extract_generated_text(response):
+    """Extract generated text from Completions, Chat Completions, or Responses."""
+    choices = response.get("choices", [])
+    if choices:
+        choice = choices[0]
+        if isinstance(choice.get("text"), str):
+            return choice["text"]
+        message = choice.get("message", {})
+        content = message.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "".join(
+                part.get("text", "")
+                for part in content
+                if isinstance(part, dict)
+            )
+
+    if isinstance(response.get("output_text"), str):
+        return response["output_text"]
+
+    texts = []
+    for item in response.get("output", []):
+        if not isinstance(item, dict):
+            continue
+        for content in item.get("content", []):
+            if isinstance(content, dict) and isinstance(content.get("text"), str):
+                texts.append(content["text"])
+    return "".join(texts)
 
 
 class _OpenAILanguageModel:
@@ -310,7 +370,10 @@ class _OpenAILanguageModel:
         if res.status_code != 200:
             logger.error("Failed to call for edit:\n%s", res.json())
             return ""
-        return res.json()["choices"][0]["text"]
+        generated_text = _extract_generated_text(res.json())
+        if not generated_text:
+            logger.error("Model response did not contain generated text")
+        return generated_text
 
     def _call_completion(
         self, function_header: str, context_start: int, context_end: int
@@ -350,7 +413,10 @@ class _OpenAILanguageModel:
             logger.error("Failed to call for completion:\n%s", res.json())
             logger.error(self.complete_model)
             return ""
-        return res.json()["choices"][0]["text"]
+        generated_text = _extract_generated_text(res.json())
+        if not generated_text:
+            logger.error("Model response did not contain generated text")
+        return generated_text
 
     def _get_num_tokens_at_line(self, line_num: int) -> int:
         """Get the approximate number of tokens for the source file at line_num.

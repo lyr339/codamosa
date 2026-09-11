@@ -56,6 +56,43 @@ Note (June 2024): the model `code-davinci-002` is no longer available, you will 
 
 The `--model_base_url <BASE_URL> --model_relative_url <RELATIVE_URL>` options should be set so that the concatenation of the two is the URL to send model query requests to (see #29). 
 
+### OpenAI-compatible Chat Completions and Responses APIs
+
+This fork also supports OpenAI-compatible `/v1/chat/completions` and
+`/v1/responses` endpoints.  Select the API shape with `--model-relative-url`.
+For the Responses API, for example:
+
+```shell
+export CODAMOSA_API_KEY="..."
+
+docker run --rm \
+    -e CODAMOSA_API_KEY \
+    -v TARGET_PROJECT_DIRECTORY:/input:ro \
+    -v OUTPUT_DIRECTORY:/output \
+    -v TARGET_PROJECT_DIRECTORY:/package:ro \
+    codamosa-runner \
+    --project-path /input \
+    --module-name PACKAGE.MODULE \
+    --output-path /output \
+    --report-dir /output \
+    --algorithm CODAMOSA \
+    --model-name MODEL_ID \
+    --model-base-url API_BASE_URL \
+    --model-relative-url /v1/responses
+```
+
+`run-codamosa.sh` wraps the build and run steps.  It takes a target project,
+an importable module name, and an optional output directory:
+
+```shell
+CODAMOSA_API_BASE_URL="https://example.com" \
+CODAMOSA_MODEL="MODEL_ID" \
+./run-codamosa.sh /absolute/path/to/project package.module
+```
+
+The wrapper reads `CODAMOSA_API_KEY` from the environment. On macOS it can
+also use a key copied to the clipboard, and it does not persist that key.
+
 
 ## Replication package
 
