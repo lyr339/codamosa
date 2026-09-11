@@ -15,6 +15,14 @@ TARGET_PROJECT="$(cd "$1" && pwd)"
 MODULE_NAME="$2"
 OUTPUT_DIRECTORY="${3:-$HOME/Downloads/codamosa-output/${MODULE_NAME//./_}-$(date +%Y%m%d-%H%M%S)}"
 API_BASE_URL="${CODAMOSA_API_BASE_URL:-https://whh985.xyz}"
+API_BASE_URL="${API_BASE_URL%/}"
+if [[ -n "${CODAMOSA_API_PATH:-}" ]]; then
+  API_RELATIVE_URL="$CODAMOSA_API_PATH"
+elif [[ "$API_BASE_URL" == */v1 ]]; then
+  API_RELATIVE_URL="/responses"
+else
+  API_RELATIVE_URL="/v1/responses"
+fi
 MODEL_NAME="${CODAMOSA_MODEL:-gpt-5.6-sol}"
 MAX_SEARCH_TIME="${CODAMOSA_MAX_SEARCH_TIME:-120}"
 
@@ -42,7 +50,7 @@ else
 fi
 
 if ! docker info >/dev/null 2>&1; then
-  echo "Start Docker Desktop, then run this command again." >&2
+  echo "Start Docker Engine or Docker Desktop, then run this command again." >&2
   exit 1
 fi
 
@@ -68,7 +76,7 @@ docker run --rm \
   --assertion-generation NONE \
   --model-name "$MODEL_NAME" \
   --model-base-url "$API_BASE_URL" \
-  --model-relative-url /v1/responses \
+  --model-relative-url "$API_RELATIVE_URL" \
   --max-plateau-len 5 \
   --num-seeds-to-inject 1 \
   --include-partially-parsable True \

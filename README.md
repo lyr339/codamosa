@@ -60,7 +60,71 @@ The `--model_base_url <BASE_URL> --model_relative_url <RELATIVE_URL>` options sh
 
 This fork also supports OpenAI-compatible `/v1/chat/completions` and
 `/v1/responses` endpoints.  Select the API shape with `--model-relative-url`.
-For the Responses API, for example:
+
+#### Quick start for this fork
+
+Prerequisites:
+
+- Git
+- Docker Engine or Docker Desktop
+- An OpenAI-compatible API endpoint, API key, and model ID
+- A Python project to analyse
+
+Clone the fork:
+
+```shell
+git clone https://github.com/lyr339/codamosa.git
+cd codamosa
+```
+
+Configure the API connection in the current shell. The endpoint can be supplied
+with or without a trailing `/v1`:
+
+```shell
+export CODAMOSA_API_BASE_URL="https://your-api.example.com"
+export CODAMOSA_API_KEY="your-api-key"
+export CODAMOSA_MODEL="your-model-id"
+```
+
+The target project should contain either `requirements.txt` or `package.txt`.
+Run CodaMOSA by passing the absolute target-project path and its importable
+Python module name:
+
+```shell
+./run-codamosa.sh /absolute/path/to/project package.module
+```
+
+For example, a file at `/work/calculator/calculator.py` can be analysed with:
+
+```shell
+./run-codamosa.sh /work/calculator calculator
+```
+
+The wrapper builds `codamosa-runner:latest` when needed, installs the target
+project's declared dependencies inside the disposable container, runs CodaMOSA,
+and prints the generated-test output directory. Set an explicit output directory
+with the optional third argument:
+
+```shell
+./run-codamosa.sh /work/calculator calculator /work/generated-tests
+```
+
+Useful optional settings:
+
+```shell
+export CODAMOSA_MAX_SEARCH_TIME=300
+export CODAMOSA_API_PATH=/v1/responses
+```
+
+`CODAMOSA_API_PATH` can also be set to `/v1/chat/completions` for a provider
+that exposes Chat Completions instead of Responses. The API key is passed to the
+container through an environment variable and is not written to the repository.
+On macOS, when `CODAMOSA_API_KEY` is omitted, the wrapper can use an API key
+copied to the clipboard.
+
+#### Direct Docker invocation
+
+The equivalent direct Responses API invocation is:
 
 ```shell
 export CODAMOSA_API_KEY="..."
@@ -80,19 +144,6 @@ docker run --rm \
     --model-base-url API_BASE_URL \
     --model-relative-url /v1/responses
 ```
-
-`run-codamosa.sh` wraps the build and run steps.  It takes a target project,
-an importable module name, and an optional output directory:
-
-```shell
-CODAMOSA_API_BASE_URL="https://example.com" \
-CODAMOSA_MODEL="MODEL_ID" \
-./run-codamosa.sh /absolute/path/to/project package.module
-```
-
-The wrapper reads `CODAMOSA_API_KEY` from the environment. On macOS it can
-also use a key copied to the clipboard, and it does not persist that key.
-
 
 ## Replication package
 
